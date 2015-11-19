@@ -102,6 +102,11 @@ sudo chmod 600 /etc/kubernetes/ssl/*-key.pem
 sudo chown root:root /etc/kubernetes/ssl/*-key.pem
 ```
 
+If your apiserver did not restart to pick up these certificates, you can restart your kubelet to trigger a container refresh.
+```
+sudo systemctl restart kubelet
+```
+
 Before you configure the rest of your nodes, you will need to create an authentication token for Calico to access the API. Run the following command on your master or workstation and save the result.
 ```
 kubectl create -f - <<EOF
