@@ -31,9 +31,11 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-Bare Metal CoreOS with Kubernetes and Project Calico
+Bare Metal Kubernetes on CoreOS with Calico Networking
 ------------------------------------------
-This guide explains how to deploy a bare-metal Kubernetes cluster on CoreOS using [Calico networking](http://www.projectcalico.org).
+This document describes how to deploy Kubernetes with Calico networking on _bare metal_ CoreOS. For more information on Project Calico, visit [projectcalico.org](http://projectcalico.org) and the [calico-docker repository](https://github.com/projectcalico/calico-docker).
+
+To install Calico on an existing Kubernetes cluster, or for more information on deploying Calico with Kubernetes in a number of other environments take a look at our supported [deployment guides](https://github.com/projectcalico/calico-docker/tree/master/docs/kubernetes).
 
 Specifically, this guide will have you do the following:
 - Deploy a Kubernetes master node on CoreOS using cloud-config
@@ -41,7 +43,7 @@ Specifically, this guide will have you do the following:
 
 ## Prerequisites
 
-1. At least three bare-metal machines (or VMs) to work with. This guide will configure them as follows
+1. At least three bare-metal machines (or VMs) to work with. This guide will configure them as follows:
   - 1 Kubernetes Master
   - 2 Kubernetes Nodes
 2. Your nodes should have IP connectivity.
@@ -50,25 +52,9 @@ Specifically, this guide will have you do the following:
 
 This guide will use [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/) to configure each of the nodes in our Kubernetes cluster.
 
-For ease of distribution, the cloud-config files required for this demonstration can be found on [GitHub](https://github.com/projectcalico/calico-kubernetes-coreos-demo).
-
-This repo includes two cloud config files:
+We'll use two cloud-config files:
 - `master-config.yaml`: Cloud-config for the Kubernetes master
-- `node-config.yaml`: Cloud-config for each Kubernetes compute host
-
-In the next few steps you will be asked to configure these files and host them on an HTTP server where your cluster can access them.
-
-## Building Kubernetes
-
-To get the Kubernetes source, clone the GitHub repo, and build the binaries.
-
-```
-git clone https://github.com/kubernetes/kubernetes.git
-cd kubernetes
-./build/release.sh 
-```
-
-Once the binaries are built, host the entire `<kubernetes>/_output/dockerized/bin/<OS>/<ARCHITECTURE>/` folder on an accessible HTTP server so they can be accessed by the cloud-config.  You'll point your cloud-config files at this HTTP server later.
+- `node-config.yaml`: Cloud-config for each Kubernetes node
 
 ## Download CoreOS
 
@@ -78,76 +64,111 @@ Let's download the CoreOS bootable ISO.  We'll use this image to boot and instal
 wget http://stable.release.core-os.net/amd64-usr/current/coreos_production_iso_image.iso
 ```
 
-You can also download the ISO from the [CoreOS website](https://coreos.com/docs/running-coreos/platforms/iso/).
+> You can also download the ISO from the [CoreOS website](https://coreos.com/docs/running-coreos/platforms/iso/).
 
 ## Configure the Kubernetes Master
 
-Once you've downloaded the image, use it to boot your Kubernetes Master server.  Once booted, you should be automatically logged in as the `core` user.
+Once you've downloaded the image, use it to boot your Kubernetes master.  Once booted, you should be automatically logged in as the `core` user.
 
-Let's get the master-config.yaml and fill in the necessary variables.  Run the following commands on your HTTP server to get the cloud-config files.
+*On another machine*, download the `calico-kubernetes` repository, which contains the necessary cloud-config files for this guide, and make a copy of the file `master-config-template.yaml`.
 
 ```
-git clone https://github.com/Metaswitch/calico-kubernetes-demo.git
-cd calico-kubernetes-demo/coreos
+wget https://github.com/projectcalico/calico-kubernetes/archive/master.tar.gz
+tar -xvf master.tar.gz
+cp calico-kubernetes-master/config/cloud-config/master-config-template.yaml master-config.yaml
 ```
 
-You'll need to replace the following variables in the `master-config.yaml` file to match your deployment.
+You'll need to replace the following variables in the `master-config.yaml` file.
 - `<SSH_PUBLIC_KEY>`: The public key you will use for SSH access to this server.
-- `<KUBERNETES_LOC>`: The address used to get the kubernetes binaries over HTTP.
 
-> **Note:** The config will prepend `"http://"` and append `"/(kubernetes | kubectl | ...)"` to your `KUBERNETES_LOC` variable:, format accordingly
-
-Host the modified `master-config.yaml` file and pull it on to your Kubernetes Master server.
-
-The CoreOS bootable ISO comes with a tool called `coreos-install` which will allow us to install CoreOS to disk and configure the install using cloud-config.  The following command will download and install stable CoreOS, using the master-config.yaml file for configuration.
+Move the edited `master-config.yaml` to your Kubernetes master machine.  The CoreOS bootable ISO comes with a tool called `coreos-install` which will allow us to install CoreOS and configure the machine using a cloud-config file.  The following command will download and install stable CoreOS using the `master-config.yaml` file we just created for configuration.  Run this on the Kubernetes master.
 
 ```
 sudo coreos-install -d /dev/sda -C stable -c master-config.yaml
 ```
 
-Once complete, eject the bootable ISO and restart the server.  When it comes back up, you should have SSH access as the `core` user using the public key provided in the master-config.yaml file.
+Once complete, eject the bootable ISO and restart the server.  When it comes back up, you should have SSH access as the `core` user using the public key provided in the `master-config.yaml` file.
+
+Next, you will need to configure your cluster's TLS assets. To get started with Kubernetes client certificate authentication, follow the [CoreOS guide to generating Kubernetes TLS assets using OpenSSL](https://coreos.com/kubernetes/docs/latest/openssl.html).
+
+On your master, you will need to move your client and apiserver certificates to the `/etc/kubernetes/ssl/` folder with the appropriate permissions.
+```
+sudo mv ca.pem /etc/kubernetes/ssl/
+sudo mv apiserver.pem /etc/kubernetes/ssl/
+sudo mv apiserver-key.pem /etc/kubernetes/ssl/
+
+# Set Permissions
+sudo chmod 600 /etc/kubernetes/ssl/*-key.pem
+sudo chown root:root /etc/kubernetes/ssl/*-key.pem
+```
+
+If your apiserver did not restart to pick up these certificates, you can restart your kubelet to trigger a container refresh.
+```
+sudo systemctl restart kubelet
+```
+
+Before you configure the rest of your nodes, you will need to create an authentication token for Calico to access the API. Run the following command on your master or workstation and save the result.
+```
+kubectl create -f - <<EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: calico
+EOF
+export TOKEN=$(kubectl describe secret calico-token | grep token: | cut -f 2)
+```
+
 
 ## Configure the compute hosts
 
->The following steps will set up a Kubernetes node for use as a compute host.  This demo uses two compute hosts, so you should run the following steps on each.
+>The following steps will set up a single Kubernetes node for use as a compute host.  Run these steps to deploy each Kubernetes node in your cluster.
 
-First, boot up your node using the bootable ISO we downloaded earlier.  You should be automatically logged in as the `core` user.
+First, boot up the node machine using the bootable ISO we downloaded earlier.  You should be automatically logged in as the `core` user.
 
-Let's modify the `node-config.yaml` cloud-config file on your HTTP server.  Make a copy for this node, and fill in the necessary variables.
+Make a copy of the `node-config-template.yaml` for this machine.
+
+```
+cp calico-kubernetes-master/config/cloud-config/node-config-template.yaml node-config.yaml
+```
 
 You'll need to replace the following variables in the `node-config.yaml` file to match your deployment.
 - `<HOSTNAME>`: Hostname for this node (e.g. kube-node1, kube-node2)
 - `<SSH_PUBLIC_KEY>`: The public key you will use for SSH access to this server.
 - `<KUBERNETES_MASTER>`: The IPv4 address of the Kubernetes master.
-- `<KUBERNETES_LOC>`: The address to use in order to get the kubernetes binaries over HTTP.
-- `<DOCKER_BRIDGE_IP>`: The IP and subnet to use for pods on this node.  By default, this should fall within the 192.168.0.0/16 subnet.
+- `<AUTH_TOKEN>`: The API access token generated in the previous step.
 
-> Note: The DOCKER_BRIDGE_IP is the range used by this Kubernetes node to assign IP addresses to pods on this node.  This subnet must not overlap with the subnets assigned to the other Kubernetes nodes in your cluster.  Calico expects each DOCKER_BRIDGE_IP subnet to fall within 192.168.0.0/16 by default (e.g. 192.168.1.1/24 for node 1), but if you'd like to use pod IPs within a different subnet, simply run `calicoctl pool add <your_subnet>` and select DOCKER_BRIDGE_IP accordingly.
+Next, you will need to add the certificates generated in the previous step to the cloud-config. Replace the following placeholders with your TLS assests.
+- `<CA_CERT>`: Complete contents of `ca.pem`
+- `<WORKER_CERT>`: Complete contents of `worker.pem`
+- `<WORKER_KEYS>`: Complete contents of `worker-key.pem`
 
-Host the modified `node-config.yaml` file and pull it on to your Kubernetes node.
-
-```
-wget http://<http_server_ip>/node-config.yaml
-```
-
-Install and configure CoreOS on the node using the following command.
+Move the modified `node-config.yaml` to your Kubernetes node machine and install and configure CoreOS on the node using the following command.
 
 ```
 sudo coreos-install -d /dev/sda -C stable -c node-config.yaml
 ```
 
-Once complete, restart the server.  When it comes back up, you should have SSH access as the `core` user using the public key provided in the `node-config.yaml` file.  It will take some time for the node to be fully configured.  Once fully configured, you can check that the node is running with the following command on the Kubernetes master.
+Once complete, eject the bootable disc and restart the server.  When it comes back up, you should have SSH access as the `core` user using the public key provided in the `node-config.yaml` file.  It will take some time for the node to be fully configured.
 
+## Connectivity Outside the Cluster
+To setup Internet Connectivity for your containers, you may need to program the NAT rules described in our [Ubuntu Guide](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/ubuntu-calico.md#nat-on-the-nodes).
+
+## Configure Your Workstation
+To administrate your cluster from a separate host, you will need the client and admin certificates generated earlier (`ca.pem`, `admin.pem`, `admin-key.pem`). With certificates in place, run the following commands with the appropriate filepaths.
 ```
-/home/core/kubectl get nodes
+kubectl config set-cluster calico-cluster --server=https://<KUBERNETES_MASTER> --certificate-authority=<CA_CERT_PATH>
+kubectl config set-credentials calico-admin --certificate-authority=<CA_CERT_PATH> --client-key=<ADMIN_KEY_PATH> --client-certificate=<ADMIN_CERT_PATH>
+kubectl config set-context calico --cluster=calico-cluster --user=calico-admin
+kubectl config use-context calico
 ```
 
-## Testing the Cluster
+Check your work with `kubectl get nodes`.
 
-You should now have a functional bare-metal Kubernetes cluster with one master and two compute hosts.
-Try running the [guestbook demo](../../../examples/guestbook/) to test out your new cluster!
-
-
+## Run DNS
+With your cluster ready, you can bring up DNS services using the manifest provided in the `calico-kubernetes` repo.
+```
+kubectl create -f calico-kubernetes-master/config/master/dns/skydns.yaml
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/bare_metal_calico.md?pixel)]()
