@@ -14,6 +14,11 @@ base:
     - cadvisor
     - kube-client-tools
     - kubelet
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-minion
+{% elif pillar.get('network_provider', '').lower() == 'calico' %}
+    - calico.node
+{% else %}
     - kube-proxy
 {% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
   {% if pillar['logging_destination'] == 'elasticsearch' %}
@@ -57,6 +62,11 @@ base:
 {% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
     - docker
     - kubelet
+{% endif %}
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-master
+{% elif pillar.get('network_provider', '').lower() == 'calico' %}
+    - calico.master
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':
