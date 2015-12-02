@@ -23,6 +23,8 @@ base:
     - kubelet
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-minion
+{% elif pillar.get('network_provider', '').lower() == 'calico' %}
+    - calico.node
 {% else %}
     - kube-proxy
 {% endif %}
@@ -75,6 +77,8 @@ base:
 {% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
+{% elif pillar.get('network_provider', '').lower() == 'calico' %}
+    - calico.master
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':

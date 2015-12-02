@@ -107,7 +107,12 @@ for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
 done
 
 # Configure network
-provision-network-minion
+if [ "${NETWORK_PROVIDER}" == "calico" ]; then
+  echo "Using default networking for Calico on minion"
+else
+  echo "Provisioning flannel network on minion"
+  provision-network-minion
+fi
 
 # Placeholder for any other manifests that may be per-node.
 mkdir -p /etc/kubernetes/manifests
@@ -144,13 +149,13 @@ EOF
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   cloud: vagrant
-  network_mode: openvswitch
   node_ip: '$(echo "$NODE_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   networkInterfaceName: '$(echo "$NETWORK_IF_NAME" | sed -e "s/'/''/g")'
   roles:
     - kubernetes-pool
-  cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
+  cbr-cidr: '$(echo "$NODE_CONTAINER_CIDR" | sed -e "s/'/''/g")'
+  container_subnet: '$(echo "$NODE_CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   hostname_override: '$(echo "$NODE_IP" | sed -e "s/'/''/g")'
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
