@@ -3,8 +3,8 @@
 calicoctl:
   file.managed:
     - name: /usr/bin/calicoctl
-    - source: https://github.com/projectcalico/calico-docker/releases/download/v0.12.0/calicoctl
-    - source_hash: sha512=001754f9a7ccbd434356c02ec30017448823ddcc35cda394b67680e67bda8cae704467863ca84944a940410886eba5e500f005f4744ea01204c56afc8ff12990
+    - source: https://github.com/projectcalico/calico-docker/releases/download/v0.10.0/calicoctl
+    - source_hash: sha512=5dd8110cebfc00622d49adddcccda9d4906e6bca8a777297e6c0ffbcf0f7e40b42b0d6955f2e04b457b0919cb2d5ce39d2a3255d34e6ba36e8350f50319b3896
     - makedirs: True
     - mode: 744
 
@@ -27,7 +27,7 @@ etcd:
     - name: >
                docker run --name calico-etcd -d --restart=always -p 6666:6666
                -v /varetcd:/var/etcd
-               gcr.io/google_containers/etcd:2.0.8
+               gcr.io/google_containers/etcd:2.2.1
                /usr/local/bin/etcd --name calico
                --data-dir /var/etcd/calico-data
                --advertise-client-urls http://{{grains.api_servers}}:6666

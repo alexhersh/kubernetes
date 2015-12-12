@@ -14,8 +14,8 @@ calicoctl:
 calico-plugin:
   file.managed:
     - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico
-    - source: https://github.com/projectcalico/calico-kubernetes/releases/download/v0.6.1/calico_kubernetes
-    - source_hash: sha512=38d1ae62cf2a8848946e0d7442e91bcdefd3ac8c2167cdbc6925c25e5eb9c8b60d1f348eb861de34f4167ef6e19842c37b18c5fc3804cfdca788a65d625c5502
+    - source: https://github.com/projectcalico/calico-kubernetes/releases/download/v0.7.0/calico_kubernetes
+    - source_hash: sha512=f5764917522a0caec84b3ea61e191020b2e038cd6393b152e300739dbdc754e1c03bf1ba24f333d63e506cde8ed749f69a4b2e8717830c8c36625926167187b5
     - makedirs: True
     - mode: 744
     - require_in:
