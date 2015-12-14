@@ -16,10 +16,9 @@ base:
     - kubelet
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-minion
-{% elif pillar.get('network_provider', '').lower() == 'calico' %}
-    - calico.node
 {% else %}
     - kube-proxy
+{% endif %}
 {% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
   {% if pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es
@@ -32,6 +31,9 @@ base:
 {% endif %}
     - logrotate
     - supervisor
+{% if pillar.get('network_provider', '').lower() == 'calico' %}
+    - calico.node
+{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
