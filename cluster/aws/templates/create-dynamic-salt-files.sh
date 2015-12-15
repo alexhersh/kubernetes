@@ -36,7 +36,10 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+network_provider: '$(echo "$NETWORK_PROVIDER")'
 num_nodes: $(echo "${NUM_MINIONS}")
+e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
+kubelet_token: '$(echo "$KUBELET_TOKEN" | sed -e "s/'/''/g")'
 EOF
 
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
