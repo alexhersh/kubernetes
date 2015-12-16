@@ -13,9 +13,19 @@ calicoctl:
 
 calico-plugin:
   file.managed:
-    - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico
-    - source: https://github.com/projectcalico/calico-kubernetes/releases/download/v0.7.0/calico_kubernetes
-    - source_hash: sha512=f5764917522a0caec84b3ea61e191020b2e038cd6393b152e300739dbdc754e1c03bf1ba24f333d63e506cde8ed749f69a4b2e8717830c8c36625926167187b5
+    - name: /opt/calico/bin/calico
+    - source: <PLUGINURL>
+    - source_hash: sha512=<PLUGINSHA>
+    - makedirs: True
+    - mode: 744
+    - require_in:
+      - service: kubelet
+
+calico-ipam-plugin:
+  file.managed:
+    - name: /opt/calico/bin/calico-ipam
+    - source: <IPAMURL>
+    - source_hash: sha512=<IPAMSHA>
     - makedirs: True
     - mode: 744
     - require_in:
@@ -23,7 +33,7 @@ calico-plugin:
 
 plugin-config:
   file.managed:
-    - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico_kubernetes.ini
+    - name: /etc/cni/net.d/10-calico.conf
     - source: salt://calico/calico_kubernetes.ini
     - template: jinja
     - makedirs: True

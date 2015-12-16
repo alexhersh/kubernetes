@@ -120,7 +120,7 @@
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
   {% set network_plugin = "--network-plugin=opencontrail" %}
 {% elif pillar.get('network_provider', '').lower() == "calico" and 'kubernetes-pool' in grains.roles -%}
-  {% set network_plugin = " --network_plugin=calico" -%}
+  {% set network_plugin = " --network_plugin=cni" -%}
 {% endif -%}
 
 {% set kubelet_port = "" -%}
