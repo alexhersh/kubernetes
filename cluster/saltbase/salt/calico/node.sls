@@ -52,6 +52,7 @@ calico-node:
       - file: calicoctl
       - file: plugin-config
       - file: calico-plugin
+      - file: calico-ipam-plugin
 
 calico-ip-pool-reset:
   cmd.run:
